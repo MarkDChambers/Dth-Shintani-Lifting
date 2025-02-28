@@ -1,0 +1,73 @@
+function QFBasis(N,t,D,CosetReps,NoOfCosets)
+	Square, Root := IsSquare(D);
+
+	//Calculate a set of representatives for L(D)/SL_2(Z)
+	if Square then
+		RF := [SymmetricMatrix([0,Root/2,i]): i in [0..Root-1]];
+	else
+		QF := ReducedForms(D);
+		RF := [SymmetricMatrix([Q[1],Q[2]/2,Q[3]]): Q in QF];
+	end if;
+	
+	NoOfForms := #RF;
+
+	//Calculate a covering set, by acting via the coset representatives
+	FormReps := [[Transpose(CosetReps[j])*RF[i]*CosetReps[j]: j in [1..NoOfCosets]]: i in [1..NoOfForms]];
+	Cosets := [[CosetReps[j]: j in [1..NoOfCosets]]: i in [1..NoOfForms]];
+
+	//Remove any class of quadratic forms that don't have Nt|a
+	//this is well defined as \Gamma_0(Nt) preserves this space
+	//and were the coset reps we chose
+	i := 1;
+	while i le #FormReps do
+		j := 1;
+		while j le #FormReps[i] do
+			Q := FormReps[i][j];
+			if (Numerator(Q[1][1]) mod (N*t)) ne 0 then
+				FormReps[i] := Remove(FormReps[i],j);
+				Cosets[i] := Remove(Cosets[i],j);
+				j := j - 1;
+			end if;
+			j := j + 1;
+		end while;
+		i := i + 1;
+	end while;
+
+	//Combine classes that are \Gamma_0(N) equivalent.
+	//As mentioned, this just depends on if the respective cosets
+	//are \Gamma_0(N) equivalent
+	i := 1;
+	while i le #FormReps do
+		j := 1;
+		while j le #FormReps[i] do
+			k := j+1;
+			while k le #FormReps[i] do
+				if ( (Cosets[i][j])^(-1) * Cosets[i][k] )[2][1] mod N eq 0 then
+					FormReps[i] := Remove(FormReps[i],k);
+					Cosets[i] := Remove(Cosets[i],k);
+					k := k-1;
+				end if;
+				k := k + 1;
+			end while;
+			j := j + 1;
+		end while;
+		i := i + 1;
+	end while;
+
+
+	//Add this set of representatives for L_{Nt}(D)/\Gamma_0(N) to one single list
+	FormRepsNew := [];
+
+	for i in [1..#FormReps] do
+		for j in [1..#FormReps[i]] do
+			FormRepsNew := Append(FormRepsNew, FormReps[i][j]);
+		end for;
+	end for;
+
+	return FormRepsNew;
+end function;
+
+
+
+
+

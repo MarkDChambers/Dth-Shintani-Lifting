@@ -1,0 +1,124 @@
+import "QFBasis.m": QFBasis;
+import "Pell.m": PellsEquation;
+
+//Calculate the projection of a symbol into the plus minus subspaces accosiated to the modular form
+//then using the normalisation coming from the basis vectors giving the modular degree
+//to calculate what the period integral (after dividing by transcendental factors) is.
+//The reason for doing this is because the intersection pairing function only takes integral classes
+
+function PeriodIntegral(XXP,XXM,XC,ModularDegree)
+	Coords := Coordinates(VectorSpaceWithBasis([XXP,XXM]),XC);
+	Periods := [-Coords[2]*ModularDegree/2,Coords[1]*ModularDegree/2];
+
+	return Periods;
+end function;
+
+
+//Calculates the genus character \omega_D(Q). This is a bodge becuase it just tries to find 
+//a good representated number by trying lots of candidates. Though it has worked so far.
+function OmegaBodge(Q,D)
+	//Q is expressed as the symmetric matrix [[a,b/2],[b/2,c]]
+	a := Numerator(Q[1][1]); b := Numerator(2*Q[1][2]); c := Numerator(Q[2][2]);
+
+	GCD := Gcd([a,b,c,D]);
+	if GCD ne 1 then
+		return 0;
+	end if;
+
+	for X in [1..100] do
+		for Y in [1..100] do
+			r := a*X^2+b*X*Y+c*Y^2;
+			if Gcd(r,D) eq 1 then
+				return KroneckerCharacter(D)(r);
+			end if;
+		end for;
+	end for;
+	return 0;
+end function;
+
+
+//Given a quadratic form, this calculates a twist of the corresponding cycle C_Q,
+//so when integrated against f, it will give the same as integrating the twist of f
+//against C_Q (this is just Birch's lemma). Though this doesn't multiply the components by
+//the character and sum them, because that would require a change of field,
+//but we can just use linearity later on
+
+function QFCycle(M,Q,Disc,x,y,Char,m)
+	//Q is expressed as the symmetric matrix [[a,b/2],[b/2,c]]
+	a := Q[1][1]; b:= 2*Q[1][2]; c := Q[2][2];
+
+	Square, Root := IsSquare(Disc);
+	if Square then
+		if a ne 0 then
+			FormCycle := [(M ! <1, [Cusps()| (-b-Root)/(2*a)+i/m,(-b+Root)/(2*a)+i/m]>) : i in [1..m]];
+		else
+			if b lt 0 then
+				FormCycle := [(M ! <1, [Cusps()| (-c/b)+i/m,Infinity()]>) : i in [1..m]];
+			else
+				FormCycle := [(M ! <1, [Cusps()| Infinity(), (-c/b)+i/m]>) : i in [1..m]];
+			end if;
+		end if;
+	else
+		FormCycle := [(M ! <1, [Cusps()| Infinity(),(x-b*y)/(2*a*y)+i/m]>) : i in [1..m]];
+	end if;
+	
+	return FormCycle;
+end function;
+
+
+//This is essentially the main formula for the lift
+function DKohnen(M,k,N,D,n,CosetReps,NoOfCosets,XXP,XXM,IntegralMap,ModularDegree,Char,N1,N2,eps, Twist, Cond)
+	Coeffs := [0*Twist(1): i in [1..n]];
+
+	for m in [1..n] do
+		if (eps*(-1)^k*m mod 4) le 1 then
+			Disc := N1^2*Abs(D)*m;
+
+			//Gets smallest positive solution to x^2-(Disc)y^2=4
+			//, in order to calculate the cycles C_Q
+			x := 0; y := 0;
+			Square, Root := IsSquare(Disc);
+			if not Square then
+				Pell := PellsEquation(Disc);
+				x := Pell[1]; y := Pell[2];
+			end if;
+
+			//Calculate a set of coset representatives for the
+			space of quadratic forms L_{N N_1}(N1^2|D|m)/Gamma_0(N)
+			QFReps := QFBasis(N, N1, Disc,CosetReps,NoOfCosets);
+			NoOfQF := #QFReps;
+
+			Integral := [0/1,0/1];
+			for i in [1..NoOfQF] do
+				//Gets the twisted cycles
+				Cycles := QFCycle(M,QFReps[i],Disc,x,y,Twist,Cond);
+
+				//calculates the period for all the components of these cycles
+				Periods := [PeriodIntegral(XXP,XXM,IntegralMap(Cycles[i]),ModularDegree): i in [1..Cond]];
+
+				//Now combines the cycles as in Birch's lemma, to give the periods
+				//against the twist of f, dividing by the transcendental factors
+				TwistedPeriod := [&+[ComplexConjugate(Twist(i))*Periods[i][j]: i in [1..Cond]]: j in [1..2]];
+
+				//The genus character \omega_D(Q)
+				Omega := OmegaBodge(QFReps[i],D);
+
+				//The character \chi(Q)
+				CharQ := Char(Numerator(QFReps[i][2][2]));
+
+				//Adds this term, coming from this quadratic form,	
+				//so to get the mth coefficient
+				Integral:= [Integral[j] + Omega*CharQ*TwistedPeriod[j]: j in [1..2] ];
+			end for;
+
+			//assuming the term is purely real or imaginary, this gives the appropriate answer
+			//i.e. Integral = [x,0] or [0,x], so this gives x
+			Coeffs[m] := &+Integral;
+		end if;
+	end for;
+
+	//Calculate the squares of the norms, and move into minimal subfield
+	Norms := [Minimise(z*ComplexConjugate(z)): z in Coeffs];
+
+	return Norms;
+end function;
