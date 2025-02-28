@@ -14,3 +14,5 @@ the different tuples/classes for the fundamental discriminants, and then pulls t
 **Pell**: Calculates the minimal positive solution to x^2-Dy^2=4 for D a discriminant
 
 **PMBasis**: Generates the basis for the plus and minus subspaces of the modular symbol space associated to a newform f
+
+**IMPORTANT NOTE**: The output of the code appears to be consistent for mth coefficients where \chi(-1)(-1)^k m is a fundamental discriminant, but when this is a discriminant, the output is very unreliable
